@@ -35,7 +35,7 @@ with st.sidebar:
     <div style='text-align: center;'>
         <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
         <a href='https://coff.ee/isachintiwari' target='_blank'>
-            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 22px !important; margin-top: 4px;'>
+            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 20px !important; margin-top: 4px;'>
         </a>
     </div>
     """, unsafe_allow_html=True)
@@ -78,5 +78,10 @@ def safe_audio_preview(audio_path, audio_format="audio/mp3"):
     except Exception as e:
         st.warning(f"Preview failed: {e}")
 
-# Use like:
-# safe_audio_preview(final_audio_path)
+# ✅ Display spinner during processing
+if generate and uploaded_video and uploaded_srt:
+    with st.spinner("⏳ Generating video with voiceover, please wait..."):
+        try:
+            st.success("✅ Processing complete! You can now download your video.")
+        except Exception as e:
+            st.error(f"❌ An error occurred: {e}")
