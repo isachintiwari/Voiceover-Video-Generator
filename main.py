@@ -5,7 +5,6 @@ import tempfile
 import streamlit as st
 from gtts import gTTS
 import requests
-from pydub import AudioSegment
 
 st.set_page_config(
     page_title="Voiceover Video Tool",
@@ -42,40 +41,47 @@ def generate_tts_clip(text, path):
     tts.save(path)
 
 def combine_audio_clips(srt_entries, output_audio_path):
-    combined = AudioSegment.silent(duration=0)
+    temp_audio_list = []
     for idx, (start, end, text) in enumerate(srt_entries):
-        start_ms = int(time_to_seconds(start) * 1000)
-        end_ms = int(time_to_seconds(end) * 1000)
-        duration_ms = end_ms - start_ms
+        start_sec = time_to_seconds(start)
+        end_sec = time_to_seconds(end)
+        duration = end_sec - start_sec
 
         tts_path = tempfile.mktemp(suffix=".mp3")
         generate_tts_clip(text, tts_path)
-        clip = AudioSegment.from_file(tts_path)
 
-        if len(clip) < duration_ms:
-            clip += AudioSegment.silent(duration=(duration_ms - len(clip)))
-        else:
-            clip = clip[:duration_ms]
+        padded_path = tempfile.mktemp(suffix=".mp3")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", tts_path,
+            "-af", f"apad=pad_dur={duration}",
+            "-t", str(duration), padded_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        silence_before = start_ms - len(combined)
-        if silence_before > 0:
-            combined += AudioSegment.silent(duration=silence_before)
+        temp_audio_list.append((start_sec, padded_path))
 
-        combined += clip
+    temp_audio_list.sort()
+    concat_txt = tempfile.mktemp(suffix=".txt")
+    with open(concat_txt, "w") as f:
+        for _, path in temp_audio_list:
+            f.write(f"file '{path}'\n")
 
-    combined.export(output_audio_path, format="mp3")
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt,
+        "-c", "copy", output_audio_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     return output_audio_path
 
 def merge_audio_music(voice_path, music_path, output_path):
     subprocess.run([
-        "ffmpeg", "-i", voice_path, "-i", music_path, "-filter_complex",
+        "ffmpeg", "-y", "-i", voice_path, "-i", music_path, "-filter_complex",
         "[0:a]volume=1.5[a0];[1:a]volume=0.3[a1];[a0][a1]amix=inputs=2:duration=longest",
         "-c:a", "aac", "-shortest", output_path
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def merge_audio_video(video_path, audio_path, output_path):
     subprocess.run([
-        "ffmpeg", "-i", video_path, "-i", audio_path, "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
+        "ffmpeg", "-y", "-i", video_path, "-i", audio_path, "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 with st.sidebar:
