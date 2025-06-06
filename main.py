@@ -1,4 +1,4 @@
-# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Fixed Sync + Background Music + Defaults)
+# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Fixed Sync by Stretching Voice Duration)
 
 import os
 import re
@@ -6,12 +6,6 @@ import subprocess
 import tempfile
 import streamlit as st
 from gtts import gTTS
-
-DEFAULT_MUSIC = {
-    "Soft Piano": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Komiku/It_Grows/Komiku_-_01_-_Friends_Call_Me_Jimmy.mp3",
-    "Ambient Loop": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Lobo_Loco/Sounds_of_the_Street/Lobo_Loco_-_01_-_Ladies_Night_ID_1179.mp3",
-    "Calm Background": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Monplaisir/Loyalty_Freak_Music/Monplaisir_-_03_-_Electric_Dawn.mp3"
-}
 
 def parse_srt_file(srt_text):
     pattern = r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.+?)(?=\n\d+\n|\Z)"
@@ -35,6 +29,7 @@ def generate_gtts_clip(text, wav_path):
     subprocess.run([
         "ffmpeg", "-y", "-i", tts_mp3, "-ar", "44100", "-ac", "1", wav_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("Generated WAV:", wav_path, "Exists:", os.path.exists(wav_path))
 
 def stretch_audio_to_duration(input_path, output_path, target_duration):
     subprocess.run([
@@ -81,21 +76,6 @@ def build_timed_audio_srt(srt_entries, output_path):
         st.text("FFmpeg audio error:")
         st.code(result.stderr.decode())
 
-def add_background_music(voice_path, music_path, final_audio_path):
-    result = subprocess.run([
-        "ffmpeg", "-y",
-        "-i", voice_path,
-        "-i", music_path,
-        "-filter_complex",
-        "[1:a]volume=0.1[a1];[0:a][a1]amix=inputs=2:duration=first:dropout_transition=2",
-        "-c:a", "aac",
-        final_audio_path
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    if not os.path.exists(final_audio_path):
-        st.error("❌ Failed to mix background music.")
-        st.code(result.stderr.decode())
-
 def merge_audio_video(video_path, audio_path, output_path):
     result = subprocess.run([
         "ffmpeg", "-y",
@@ -113,12 +93,10 @@ def merge_audio_video(video_path, audio_path, output_path):
         st.code(result.stderr.decode())
 
 # Streamlit UI
-st.title("🎙️ Voiceover Video Generator from SRT + Optional Background Music")
+st.title("🎙️ Voiceover Video Generator from SRT")
 
 uploaded_video = st.file_uploader("Upload your MP4 video", type=["mp4"])
 uploaded_srt = st.file_uploader("Upload your SRT file", type=["srt"])
-uploaded_music = st.file_uploader("(Optional) Upload your own background music (MP3)", type=["mp3"])
-default_music_choice = st.selectbox("Or choose a default music", ["None"] + list(DEFAULT_MUSIC.keys()))
 
 if st.button("Generate Voiceover") and uploaded_video and uploaded_srt:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
@@ -131,28 +109,10 @@ if st.button("Generate Voiceover") and uploaded_video and uploaded_srt:
     voice_path = tempfile.mktemp(suffix=".aac")
     build_timed_audio_srt(parsed_entries, voice_path)
 
-    # Handle background music (uploaded or default)
-    final_audio = voice_path
-    music_path = None
-
-    if uploaded_music:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_music:
-            tmp_music.write(uploaded_music.read())
-            music_path = tmp_music.name
-    elif default_music_choice != "None":
-        music_url = DEFAULT_MUSIC[default_music_choice]
-        music_path = tempfile.mktemp(suffix=".mp3")
-        subprocess.run(["wget", music_url, "-O", music_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    if music_path:
-        mixed_audio = tempfile.mktemp(suffix=".aac")
-        add_background_music(voice_path, music_path, mixed_audio)
-        final_audio = mixed_audio
-
-    st.audio(final_audio, format="audio/aac")
+    st.audio(voice_path, format="audio/aac")
 
     final_output = tempfile.mktemp(suffix=".mp4")
-    merge_audio_video(video_path, final_audio, final_output)
+    merge_audio_video(video_path, voice_path, final_output)
 
     if os.path.exists(final_output):
         st.success("✅ Your video is ready! Download below:")
