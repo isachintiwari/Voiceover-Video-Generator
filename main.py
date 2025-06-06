@@ -1,21 +1,14 @@
-# Voiceover Video Tool - GitHub Ready Version
-
-# Description:
-# This Python tool lets you take a video and a timestamped script to auto-generate a voiceover
-# and export the final video with synced narration.
-#
-# ✅ Accepts script in the format:
-# [0:00 - 0:05]
-# "Text to narrate."
+# Voiceover Video Tool - Streamlit + ffmpeg-python Version (No MoviePy)
 
 import os
 import re
-from moviepy.editor import VideoFileClip, AudioFileClip
+import tempfile
+import subprocess
+import streamlit as st
 from pydub import AudioSegment
 from gtts import gTTS
 
 def parse_script(script_text):
-    """Parses timestamped script into a list of (start, end, text) tuples."""
     blocks = re.findall(r"\[(.*?)\]\n\"(.*?)\"", script_text, re.DOTALL)
     script_entries = []
     for block in blocks:
@@ -25,7 +18,6 @@ def parse_script(script_text):
     return script_entries
 
 def time_to_seconds(t):
-    """Convert MM:SS string to total seconds."""
     minutes, seconds = map(float, t.split(':'))
     return int(minutes * 60 + seconds)
 
@@ -38,42 +30,58 @@ def generate_voice_clip(text, lang='en'):
     return clip
 
 def create_voiceover_audio(script_entries):
-    """Generate voiceover audio aligned to the script timestamps."""
     audio = AudioSegment.silent(duration=0)
     for start, end, text in script_entries:
         start_ms = time_to_seconds(start) * 1000
         end_ms = time_to_seconds(end) * 1000
         target_duration = end_ms - start_ms
         voice_clip = generate_voice_clip(text)
-
         if len(voice_clip) < target_duration:
             voice_clip += AudioSegment.silent(duration=target_duration - len(voice_clip))
         else:
             voice_clip = voice_clip[:target_duration]
-
         pad_duration = start_ms - len(audio)
         if pad_duration > 0:
             audio += AudioSegment.silent(duration=pad_duration)
-
         audio += voice_clip
     return audio
 
-def combine_video_audio(video_path, audio_output_path, final_output_path):
-    video = VideoFileClip(video_path)
-    audio = AudioFileClip(audio_output_path)
-    video = video.set_audio(audio)
-    video.write_videofile(final_output_path, codec='libx264', audio_codec='aac')
+def combine_video_audio_ffmpeg(video_path, audio_path, output_path):
+    # Use ffmpeg to merge audio and video
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-i", audio_path,
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-shortest",
+        output_path
+    ]
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-# Example usage (replace these paths with your files):
-"""
-with open("script.txt") as f:
-    script_text = f.read()
+# Streamlit app interface
+st.title("🎙️ Video Voiceover Generator")
+st.write("Upload a video and a timestamped script. We'll add an AI-generated voiceover for you!")
 
-entries = parse_script(script_text)
-audio = create_voiceover_audio(entries)
-audio.export("voiceover_output.mp3", format="mp3")
-combine_video_audio("input_video.mp4", "voiceover_output.mp3", "final_output.mp4")
-"""
+uploaded_video = st.file_uploader("Upload your video (mp4)", type=["mp4"])
+uploaded_script = st.text_area("Paste your script (timestamped)", height=300)
 
-# To convert into a web app, use Streamlit:
-# streamlit run app.py
+if st.button("Generate Voiceover") and uploaded_video and uploaded_script:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
+        tmp_video.write(uploaded_video.read())
+        video_path = tmp_video.name
+
+    entries = parse_script(uploaded_script)
+    voice_audio = create_voiceover_audio(entries)
+
+    audio_path = tempfile.mktemp(suffix=".mp3")
+    voice_audio.export(audio_path, format="mp3")
+
+    output_path = tempfile.mktemp(suffix=".mp4")
+    combine_video_audio_ffmpeg(video_path, audio_path, output_path)
+
+    st.success("✅ Voiceover added! Download your video below:")
+    with open(output_path, "rb") as f:
+        st.download_button("📥 Download Final Video", f, file_name="final_output.mp4")
