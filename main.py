@@ -32,6 +32,7 @@ def generate_gtts_clip(text, wav_path):
     subprocess.run([
         "ffmpeg", "-y", "-i", tts_mp3, "-ar", "44100", "-ac", "1", wav_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("Generated WAV:", wav_path, "Exists:", os.path.exists(wav_path))
 
 
 def build_timed_audio_srt(srt_entries, output_path):
@@ -77,7 +78,11 @@ def build_timed_audio_srt(srt_entries, output_path):
 
 def merge_audio_video(video_path, audio_path, output_path):
     result = subprocess.run([
-        "ffmpeg", "-y", "-i", video_path, "-i", audio_path,
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-i", audio_path,
+        "-map", "0:v:0",
+        "-map", "1:a:0",
         "-c:v", "copy", "-c:a", "aac", "-shortest",
         output_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -104,6 +109,8 @@ if st.button("Generate Voiceover") and uploaded_video and uploaded_srt:
 
     voice_path = tempfile.mktemp(suffix=".aac")
     build_timed_audio_srt(parsed_entries, voice_path)
+
+    st.audio(voice_path, format="audio/aac")
 
     final_output = tempfile.mktemp(suffix=".mp4")
     merge_audio_video(video_path, voice_path, final_output)
