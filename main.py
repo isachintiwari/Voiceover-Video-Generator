@@ -151,3 +151,7 @@ if generate and uploaded_video and uploaded_srt:
         st.success("✅ Video generated successfully!")
         with open(final_output, "rb") as f:
             st.download_button("📥 Download Final Video", f, file_name="voiceover_output.mp4")
+
+st.markdown("---")
+st.markdown("Made with ❤️ by [@isachintiwari](https://coff.ee/isachintiwari)")
+st.markdown("<a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 45px !important; width: 162px !important;'></a>", unsafe_allow_html=True)
