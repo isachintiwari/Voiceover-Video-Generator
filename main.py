@@ -41,49 +41,28 @@ def generate_tts_clip(text, path):
     tts.save(path)
 
 def create_voiceover_wav(srt_entries, output_path):
-    last_end_sec = 0
-    concat_txt = tempfile.mktemp(suffix=".txt")
-    files_to_merge = []
-
+    wav_files = []
     for idx, (start, end, text) in enumerate(srt_entries):
         start_sec = time_to_seconds(start)
-        end_sec = time_to_seconds(end)
-        duration = end_sec - start_sec
-        silence_duration = max(0, start_sec - last_end_sec)
-
+        tts_path = tempfile.mktemp(suffix=".mp3")
+        wav_path = tempfile.mktemp(suffix=".wav")
         silence_path = tempfile.mktemp(suffix=".wav")
-        tts_mp3 = tempfile.mktemp(suffix=".mp3")
-        tts_wav = tempfile.mktemp(suffix=".wav")
-        stretched_path = tempfile.mktemp(suffix=".wav")
+        combined_path = tempfile.mktemp(suffix=".wav")
 
-        # Silence before speech
-        if silence_duration > 0:
-            subprocess.run([
-                "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
-                "-t", str(silence_duration), silence_path
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            files_to_merge.append(silence_path)
+        generate_tts_clip(text, tts_path)
 
-        # TTS + stretch to subtitle duration
-        generate_tts_clip(text, tts_mp3)
-        subprocess.run(["ffmpeg", "-y", "-i", tts_mp3, tts_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run([
-            "ffmpeg", "-y", "-i", tts_wav, "-af", f"apad=pad_dur={duration}", "-t", str(duration), stretched_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        files_to_merge.append(stretched_path)
+        subprocess.run(["ffmpeg", "-y", "-i", tts_path, wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", str(start_sec), silence_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["ffmpeg", "-y", "-i", silence_path, "-i", wav_path, "-filter_complex", "[0][1]concat=n=2:v=0:a=1[out]", "-map", "[out]", combined_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        last_end_sec = end_sec
+        wav_files.append(combined_path)
 
-    # Write file list
+    concat_txt = tempfile.mktemp(suffix=".txt")
     with open(concat_txt, "w") as f:
-        for fpath in files_to_merge:
-            f.write(f"file '{fpath}'\n")
+        for path in wav_files:
+            f.write(f"file '{path}'\n")
 
-    # Merge to one AAC file
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c:a", "aac", output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
+    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c", "copy", output_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def merge_audio_music(voice_path, music_path, output_path):
     result = subprocess.run([
@@ -109,6 +88,11 @@ with st.sidebar:
     uploaded_srt = st.file_uploader("Upload SRT subtitles", type=["srt"])
     uploaded_music = st.file_uploader("(Optional) Upload your own background music (MP3)", type=["mp3"])
     default_music_choice = st.selectbox("Or choose a default music", ["None"] + list(DEFAULT_MUSIC.keys()))
+    test_text = st.text_input("Test a subtitle line:", "Hello, this is a test voiceover.")
+    if st.button("Test Voice"):
+        preview_path = tempfile.mktemp(suffix=".mp3")
+        generate_tts_clip(test_text, preview_path)
+        st.audio(preview_path)
     generate = st.button("Generate Voiceover")
 
 st.title("🎧 Voiceover Video Generator")
