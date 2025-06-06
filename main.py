@@ -37,7 +37,7 @@ Upload your video and SRT file on the left to begin.
 """)
 
 def parse_srt_file(srt_text):
-    pattern = r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.+?)(?=\n\d+\n|\Z)"
+    pattern = r"(\\d+)\\s+([\\d:,]+) --> ([\\d:,]+)\\s+(.+?)(?=\\n\\d+\\n|\\Z)"
     matches = re.findall(pattern, srt_text.strip(), re.DOTALL)
     entries = []
     for _, start, end, text in matches:
@@ -82,10 +82,10 @@ def build_timed_audio_srt(srt_entries, output_path):
                     "anullsrc=channel_layout=mono:sample_rate=44100",
                     "-t", str(silence_duration), silence_path, "-y"
                 ], stdout=subprocess.PIPE)
-                concat_file.write(f"file '{silence_path}'\n")
+                concat_file.write(f"file '{silence_path}'\\n")
             generate_gtts_clip(text, voice_path)
             stretch_audio_to_duration(voice_path, stretched_path, duration)
-            concat_file.write(f"file '{stretched_path}'\n")
+            concat_file.write(f"file '{stretched_path}'\\n")
             last_end = end_sec
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
@@ -152,6 +152,7 @@ if generate and uploaded_video and uploaded_srt:
         with open(final_output, "rb") as f:
             st.download_button("📥 Download Final Video", f, file_name="voiceover_output.mp4")
 
+# Footer
 st.markdown("---")
-st.markdown("Made with ❤️ by [@isachintiwari](https://coff.ee/isachintiwari)")
-st.markdown("<a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 45px !important; width: 162px !important;'></a>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center;'><a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 45px !important; width: 162px !important;'></a></div>", unsafe_allow_html=True)
