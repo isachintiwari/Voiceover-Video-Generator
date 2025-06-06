@@ -53,13 +53,14 @@ def combine_audio_clips(srt_entries, output_audio_path):
         for clip in clips:
             f.write(f"file '{clip}'\n")
     final_path = output_audio_path
-    subprocess.run(["ffmpeg", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c", "copy", final_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["ffmpeg", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c:a", "libmp3lame", final_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return final_path
 
 def merge_audio_music(voice_path, music_path, output_path):
     subprocess.run([
         "ffmpeg", "-i", voice_path, "-i", music_path, "-filter_complex",
-        "[0:a][1:a]amix=inputs=2:duration=longest", "-c:a", "aac", output_path
+        "[0:a]volume=1.5[a0];[1:a]volume=0.3[a1];[a0][a1]amix=inputs=2:duration=longest",
+        "-c:a", "aac", "-shortest", output_path
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def merge_audio_video(video_path, audio_path, output_path):
@@ -80,7 +81,7 @@ with st.sidebar:
     <div style='text-align: center;'>
         <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
         <a href='https://coff.ee/isachintiwari' target='_blank'>
-            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 20px !important; margin-top: 4px;'>
+            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 18px !important; margin-top: 4px;'>
         </a>
     </div>
     """, unsafe_allow_html=True)
@@ -120,7 +121,7 @@ if generate and uploaded_video and uploaded_srt:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as v_tmp:
                 v_tmp.write(uploaded_video.read())
                 video_path = v_tmp.name
-            
+
             srt_text = uploaded_srt.read().decode("utf-8")
             entries = parse_srt(srt_text)
 
