@@ -1,4 +1,4 @@
-# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Improved Sync + Error Logging)
+# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (WAV Fix for Sync Errors)
 
 import os
 import re
@@ -26,12 +26,11 @@ def srt_time_to_seconds(t):
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
 
 
-def generate_gtts_clip(text, path):
-    tts_path = path.replace(".mp3", "_raw.mp3")
-    gTTS(text).save(tts_path)
-    # Convert to proper format for concat
+def generate_gtts_clip(text, wav_path):
+    tts_mp3 = wav_path.replace(".wav", ".mp3")
+    gTTS(text).save(tts_mp3)
     subprocess.run([
-        "ffmpeg", "-y", "-i", tts_path, "-ar", "44100", "-ac", "2", "-b:a", "192k", path
+        "ffmpeg", "-y", "-i", tts_mp3, "-ar", "44100", "-ac", "1", wav_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
@@ -46,29 +45,28 @@ def build_timed_audio_srt(srt_entries, output_path):
             duration = end_sec - start_sec
 
             silence_duration = max(0, start_sec - last_end)
-            silence_path = os.path.join(tempfile.gettempdir(), f"silence_{i}.mp3")
-            voice_path = os.path.join(tempfile.gettempdir(), f"voice_{i}.mp3")
-            trimmed_path = os.path.join(tempfile.gettempdir(), f"voice_trimmed_{i}.mp3")
+            silence_path = os.path.join(tempfile.gettempdir(), f"silence_{i}.wav")
+            voice_path = os.path.join(tempfile.gettempdir(), f"voice_{i}.wav")
+            trimmed_path = os.path.join(tempfile.gettempdir(), f"voice_trimmed_{i}.wav")
 
             if silence_duration > 0:
                 subprocess.run([
                     "ffmpeg", "-f", "lavfi", "-i",
                     "anullsrc=channel_layout=mono:sample_rate=44100",
-                    "-t", str(silence_duration), "-q:a", "9", "-acodec", "libmp3lame", silence_path, "-y"
+                    "-t", str(silence_duration), silence_path, "-y"
                 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 concat_file.write(f"file '{silence_path}'\n")
 
             generate_gtts_clip(text, voice_path)
             subprocess.run([
-                "ffmpeg", "-y", "-i", voice_path, "-t", str(duration),
-                "-ar", "44100", "-ac", "2", "-b:a", "192k", trimmed_path
+                "ffmpeg", "-y", "-i", voice_path, "-t", str(duration), trimmed_path
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             concat_file.write(f"file '{trimmed_path}'\n")
             last_end = end_sec
 
     result = subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-        "-i", concat_txt, "-acodec", "aac", output_path
+        "-i", concat_txt, "-c:a", "aac", output_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     if not os.path.exists(output_path):
@@ -104,7 +102,7 @@ if st.button("Generate Voiceover") and uploaded_video and uploaded_srt:
     srt_text = uploaded_srt.read().decode("utf-8")
     parsed_entries = parse_srt_file(srt_text)
 
-    voice_path = tempfile.mktemp(suffix=".mp3")
+    voice_path = tempfile.mktemp(suffix=".aac")
     build_timed_audio_srt(parsed_entries, voice_path)
 
     final_output = tempfile.mktemp(suffix=".mp4")
