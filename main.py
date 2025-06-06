@@ -8,6 +8,9 @@ import streamlit as st
 from pydub import AudioSegment
 from gtts import gTTS
 
+# Ensure ffmpeg path for pydub (Streamlit Cloud)
+AudioSegment.converter = "/usr/bin/ffmpeg"
+
 def parse_script(script_text):
     blocks = re.findall(r"\[(.*?)\]\n\"(.*?)\"", script_text, re.DOTALL)
     script_entries = []
