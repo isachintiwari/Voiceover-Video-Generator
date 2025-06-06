@@ -31,8 +31,11 @@ with st.sidebar:
     generate = st.button("Generate Voiceover")
 
     st.markdown("---")
-    st.markdown("<div style='text-align: center;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></div>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align: center;'><a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 45px !important; width: 162px !important;'></a></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.markdown("<div style='text-align: center; font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></div>", unsafe_allow_html=True)
+    with col2:
+        st.markdown("<div style='text-align: center;'><a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 38px !important;'></a></div>", unsafe_allow_html=True)
 
 st.title("🎙️ Voiceover Video Generator")
 st.markdown("""
