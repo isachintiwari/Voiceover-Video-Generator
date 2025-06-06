@@ -79,7 +79,7 @@ with st.sidebar:
     st.markdown("""
     <div style='text-align: center;'>
         <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
-        <a href='https://coff.ee/isachintiwari' target='_blank' style="display:none";>
+        <a href='https://coff.ee/isachintiwari' target='_blank'>
             <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 20px !important; margin-top: 4px;'>
         </a>
     </div>
@@ -151,7 +151,9 @@ if generate and uploaded_video and uploaded_srt:
 
             st.success("✅ Processing complete! You can now download your video.")
             with open(final_video, "rb") as f:
-                st.video(f.read())
+                video_bytes = f.read()
+                st.video(video_bytes)
+            with open(final_video, "rb") as f:
                 st.download_button("📥 Download Final Video", f, file_name="final_output.mp4")
         except Exception as e:
             st.error(f"❌ An error occurred: {e}")
