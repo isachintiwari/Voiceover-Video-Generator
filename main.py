@@ -42,27 +42,51 @@ def generate_tts_clip(text, path):
 
 def create_voiceover_wav(srt_entries, output_path):
     wav_files = []
+    last_end_sec = 0
+
     for idx, (start, end, text) in enumerate(srt_entries):
         start_sec = time_to_seconds(start)
+        end_sec = time_to_seconds(end)
+        duration = end_sec - start_sec
+        silence_duration = max(0, start_sec - last_end_sec)
+
+        # Paths
         tts_path = tempfile.mktemp(suffix=".mp3")
-        wav_path = tempfile.mktemp(suffix=".wav")
         silence_path = tempfile.mktemp(suffix=".wav")
-        combined_path = tempfile.mktemp(suffix=".wav")
+        voice_wav_path = tempfile.mktemp(suffix=".wav")
+        stretched_wav_path = tempfile.mktemp(suffix=".wav")
 
+        # Generate TTS and convert to wav
         generate_tts_clip(text, tts_path)
+        subprocess.run(["ffmpeg", "-y", "-i", tts_path, voice_wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        subprocess.run(["ffmpeg", "-y", "-i", tts_path, wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", str(start_sec), silence_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["ffmpeg", "-y", "-i", silence_path, "-i", wav_path, "-filter_complex", "[0][1]concat=n=2:v=0:a=1[out]", "-map", "[out]", combined_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Stretch to exact subtitle duration
+        subprocess.run([
+            "ffmpeg", "-y", "-i", voice_wav_path,
+            "-filter:a", f"apad=pad_dur={duration}",
+            "-t", str(duration), stretched_wav_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        wav_files.append(combined_path)
+        # Add silence gap before subtitle
+        if silence_duration > 0:
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "lavfi", "-i",
+                "anullsrc=r=44100:cl=mono",
+                "-t", str(silence_duration), silence_path
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            wav_files.append(silence_path)
 
+        wav_files.append(stretched_wav_path)
+        last_end_sec = end_sec
+
+    # Concatenate all parts
     concat_txt = tempfile.mktemp(suffix=".txt")
     with open(concat_txt, "w") as f:
         for path in wav_files:
             f.write(f"file '{path}'\n")
 
-    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c", "copy", output_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c:a", "aac", output_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 def merge_audio_music(voice_path, music_path, output_path):
     result = subprocess.run([
