@@ -1,4 +1,4 @@
-# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (WAV Fix for Sync Errors)
+# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Fixed Sync by Stretching Voice Duration)
 
 import os
 import re
@@ -6,7 +6,6 @@ import subprocess
 import tempfile
 import streamlit as st
 from gtts import gTTS
-
 
 def parse_srt_file(srt_text):
     pattern = r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.+?)(?=\n\d+\n|\Z)"
@@ -19,12 +18,10 @@ def parse_srt_file(srt_text):
         entries.append((start, end, text))
     return entries
 
-
 def srt_time_to_seconds(t):
     h, m, s = t.split(":")
     s, ms = s.split(".")
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
-
 
 def generate_gtts_clip(text, wav_path):
     tts_mp3 = wav_path.replace(".wav", ".mp3")
@@ -34,6 +31,12 @@ def generate_gtts_clip(text, wav_path):
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print("Generated WAV:", wav_path, "Exists:", os.path.exists(wav_path))
 
+def stretch_audio_to_duration(input_path, output_path, target_duration):
+    subprocess.run([
+        "ffmpeg", "-y", "-i", input_path,
+        "-filter:a", f"apad=pad_dur={target_duration}",
+        "-t", str(target_duration), output_path
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 def build_timed_audio_srt(srt_entries, output_path):
     concat_txt = os.path.join(tempfile.gettempdir(), "concat_srt.txt")
@@ -48,7 +51,7 @@ def build_timed_audio_srt(srt_entries, output_path):
             silence_duration = max(0, start_sec - last_end)
             silence_path = os.path.join(tempfile.gettempdir(), f"silence_{i}.wav")
             voice_path = os.path.join(tempfile.gettempdir(), f"voice_{i}.wav")
-            trimmed_path = os.path.join(tempfile.gettempdir(), f"voice_trimmed_{i}.wav")
+            stretched_path = os.path.join(tempfile.gettempdir(), f"voice_stretch_{i}.wav")
 
             if silence_duration > 0:
                 subprocess.run([
@@ -59,10 +62,8 @@ def build_timed_audio_srt(srt_entries, output_path):
                 concat_file.write(f"file '{silence_path}'\n")
 
             generate_gtts_clip(text, voice_path)
-            subprocess.run([
-                "ffmpeg", "-y", "-i", voice_path, "-t", str(duration), trimmed_path
-            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            concat_file.write(f"file '{trimmed_path}'\n")
+            stretch_audio_to_duration(voice_path, stretched_path, duration)
+            concat_file.write(f"file '{stretched_path}'\n")
             last_end = end_sec
 
     result = subprocess.run([
@@ -74,7 +75,6 @@ def build_timed_audio_srt(srt_entries, output_path):
         st.error("❌ Failed to generate audio from subtitles.")
         st.text("FFmpeg audio error:")
         st.code(result.stderr.decode())
-
 
 def merge_audio_video(video_path, audio_path, output_path):
     result = subprocess.run([
@@ -91,7 +91,6 @@ def merge_audio_video(video_path, audio_path, output_path):
         st.error("❌ Failed to generate final video.")
         st.text("FFmpeg merge error:")
         st.code(result.stderr.decode())
-
 
 # Streamlit UI
 st.title("🎙️ Voiceover Video Generator from SRT")
