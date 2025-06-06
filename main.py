@@ -35,7 +35,7 @@ with st.sidebar:
     <div style='text-align: center;'>
         <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
         <a href='https://coff.ee/isachintiwari' target='_blank'>
-            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 38px !important; margin-top: 5px;'>
+            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 28px !important; margin-top: 5px;'>
         </a>
     </div>
     """, unsafe_allow_html=True)
