@@ -58,15 +58,28 @@ def combine_audio_clips(srt_entries, output_audio_path):
 
 def merge_audio_music(voice_path, music_path, output_path):
     subprocess.run([
-        "ffmpeg", "-i", voice_path, "-i", music_path, "-filter_complex",
-        "[0:a]volume=1.5[a0];[1:a]volume=0.3[a1];[a0][a1]amix=inputs=2:duration=longest",
-        "-c:a", "aac", "-shortest", output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        "ffmpeg", "-y",
+        "-i", voice_path,
+        "-i", music_path,
+        "-filter_complex",
+        "[0:a]volume=1.5[a0];[1:a]volume=0.2[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=2",
+        "-c:a", "aac",
+        "-shortest", output_path
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
 
 def merge_audio_video(video_path, audio_path, output_path):
     subprocess.run([
-        "ffmpeg", "-i", video_path, "-i", audio_path, "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-i", audio_path,
+        "-map", "0:v", "-map", "1:a",
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-shortest", output_path
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
 
 with st.sidebar:
     st.header("🎛️ Configuration")
