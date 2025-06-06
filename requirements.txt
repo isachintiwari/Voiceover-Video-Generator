@@ -2,3 +2,4 @@ streamlit
 moviepy
 pydub
 gtts
+imageio[ffmpeg]
