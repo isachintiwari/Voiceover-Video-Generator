@@ -31,17 +31,21 @@ with st.sidebar:
     generate = st.button("Generate Voiceover")
 
     st.markdown("---")
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        st.markdown("<div style='text-align: center; font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown("<div style='text-align: center;'><a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 38px !important;'></a></div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center;'>
+        <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
+        <a href='https://coff.ee/isachintiwari' target='_blank'>
+            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 38px !important; margin-top: 5px;'>
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.title("🎙️ Voiceover Video Generator")
 st.markdown("""
 This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
 Upload your video and SRT file on the left to begin.
 """)
+
 
 def parse_srt_file(srt_text):
     pattern = r"(\\d+)\\s+([\\d:,]+) --> ([\\d:,]+)\\s+(.+?)(?=\\n\\d+\\n|\\Z)"
