@@ -30,6 +30,10 @@ with st.sidebar:
     default_music_choice = st.selectbox("Or choose a default music", ["None"] + list(DEFAULT_MUSIC.keys()))
     generate = st.button("Generate Voiceover")
 
+    st.markdown("---")
+    st.markdown("<div style='text-align: center;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center;'><a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 45px !important; width: 162px !important;'></a></div>", unsafe_allow_html=True)
+
 st.title("🎙️ Voiceover Video Generator")
 st.markdown("""
 This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
@@ -151,8 +155,3 @@ if generate and uploaded_video and uploaded_srt:
         st.success("✅ Video generated successfully!")
         with open(final_output, "rb") as f:
             st.download_button("📥 Download Final Video", f, file_name="voiceover_output.mp4")
-
-# Footer
-st.markdown("---")
-st.markdown("<div style='text-align: center;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></div>", unsafe_allow_html=True)
-st.markdown("<div style='text-align: center;'><a href='https://coff.ee/isachintiwari' target='_blank'><img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 45px !important; width: 162px !important;'></a></div>", unsafe_allow_html=True)
