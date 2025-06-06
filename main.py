@@ -4,7 +4,6 @@ import subprocess
 import tempfile
 import streamlit as st
 from gtts import gTTS
-import requests
 
 st.set_page_config(
     page_title="Voiceover Video Tool",
@@ -21,67 +20,6 @@ DEFAULT_MUSIC = {
     "Calm Background": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Monplaisir/Loyalty_Freak_Music/Monplaisir_-_03_-_Electric_Dawn.mp3"
 }
 
-def parse_srt(file_content):
-    entries = []
-    blocks = re.split(r"\n\n", file_content.strip())
-    for block in blocks:
-        lines = block.strip().split("\n")
-        if len(lines) >= 3:
-            times = lines[1].split(" --> ")
-            text = " ".join(lines[2:])
-            entries.append((times[0], times[1], text))
-    return entries
-
-def time_to_seconds(t):
-    h, m, s = t.replace(",", ".").split(":")
-    return int(h)*3600 + int(m)*60 + float(s)
-
-def generate_tts_clip(text, path):
-    tts = gTTS(text)
-    tts.save(path)
-
-def create_voiceover_wav(srt_entries, output_path):
-    wav_files = []
-    for idx, (start, end, text) in enumerate(srt_entries):
-        start_sec = time_to_seconds(start)
-        tts_path = tempfile.mktemp(suffix=".mp3")
-        wav_path = tempfile.mktemp(suffix=".wav")
-        silence_path = tempfile.mktemp(suffix=".wav")
-        combined_path = tempfile.mktemp(suffix=".wav")
-
-        generate_tts_clip(text, tts_path)
-
-        subprocess.run(["ffmpeg", "-y", "-i", tts_path, wav_path])
-        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", str(start_sec), silence_path])
-        subprocess.run(["ffmpeg", "-y", "-i", silence_path, "-i", wav_path, "-filter_complex", "[0][1]concat=n=2:v=0:a=1[out]", "-map", "[out]", combined_path])
-
-        wav_files.append(combined_path)
-
-    concat_txt = tempfile.mktemp(suffix=".txt")
-    with open(concat_txt, "w") as f:
-        for path in wav_files:
-            f.write(f"file '{path}'\n")
-
-    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c", "copy", output_path])
-
-def merge_audio_music(voice_path, music_path, output_path):
-    result = subprocess.run([
-        "ffmpeg", "-y", "-i", voice_path, "-i", music_path, "-filter_complex",
-        "[0:a]volume=1.5[a0];[1:a]volume=0.3[a1];[a0][a1]amix=inputs=2:duration=longest",
-        "-c:a", "aac", "-shortest", output_path
-    ], capture_output=True)
-
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg audio merge failed: {result.stderr.decode()}")
-
-def merge_audio_video(video_path, audio_path, output_path):
-    result = subprocess.run([
-        "ffmpeg", "-y", "-i", video_path, "-i", audio_path, "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
-    ], capture_output=True)
-
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg video merge failed: {result.stderr.decode()}")
-
 with st.sidebar:
     st.header("🎛️ Configuration")
     uploaded_video = st.file_uploader("Upload MP4 video", type=["mp4"])
@@ -90,80 +28,117 @@ with st.sidebar:
     default_music_choice = st.selectbox("Or choose a default music", ["None"] + list(DEFAULT_MUSIC.keys()))
     generate = st.button("Generate Voiceover")
 
-st.title("🎧 Voiceover Video Generator")
+st.title("🎙️ Voiceover Video Generator")
 st.markdown("""
 This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
 Upload your video and SRT file on the left to begin.
-
-### 🔧 Steps to Use:
-1. **Upload your MP4 video** file using the sidebar.
-2. **Upload your .srt subtitle file**, which contains the timed narration.
-3. **(Optional)** Add your own background music or pick from the default list.
-4. Click the **Generate Voiceover** button.
-5. Wait for the tool to process and download the final video.
-
-### 📄 SRT File Format Example:
-```
-1
-00:00:00,000 --> 00:00:05,000
-Welcome! In this quick guide, you'll learn how to use this tool to create voiceovers with background music.
-
-2
-00:00:06,000 --> 00:00:15,000
-First, upload your video file and subtitle file using the options on the left.
-
-3
-00:00:16,000 --> 00:00:25,000
-Then, optionally upload background music or choose a default one. Click the button to generate your final video.
-```
-Ensure your timestamps are formatted correctly and do not overlap.
 """)
 
+def parse_srt_file(srt_text):
+    pattern = r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.+?)(?=\n\d+\n|\Z)"
+    matches = re.findall(pattern, srt_text.strip(), re.DOTALL)
+    entries = []
+    for _, start, end, text in matches:
+        start = start.replace(",", ".")
+        end = end.replace(",", ".")
+        text = " ".join(text.strip().splitlines()).strip()
+        entries.append((start, end, text))
+    return entries
+
+def srt_time_to_seconds(t):
+    h, m, s = t.split(":")
+    s, ms = s.split(".")
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
+
+def generate_gtts_clip(text, wav_path):
+    tts_mp3 = wav_path.replace(".wav", ".mp3")
+    gTTS(text).save(tts_mp3)
+    subprocess.run(["ffmpeg", "-y", "-i", tts_mp3, "-ar", "44100", "-ac", "1", wav_path], stdout=subprocess.PIPE)
+
+def stretch_audio_to_duration(input_path, output_path, target_duration):
+    subprocess.run([
+        "ffmpeg", "-y", "-i", input_path,
+        "-filter:a", f"apad=pad_dur={target_duration}",
+        "-t", str(target_duration), output_path
+    ], stdout=subprocess.PIPE)
+
+def build_timed_audio_srt(srt_entries, output_path):
+    concat_txt = os.path.join(tempfile.gettempdir(), "concat_srt.txt")
+    last_end = 0
+    with open(concat_txt, "w") as concat_file:
+        for i, (start, end, text) in enumerate(srt_entries):
+            start_sec = srt_time_to_seconds(start)
+            end_sec = srt_time_to_seconds(end)
+            duration = end_sec - start_sec
+            silence_duration = max(0, start_sec - last_end)
+            silence_path = os.path.join(tempfile.gettempdir(), f"silence_{i}.wav")
+            voice_path = os.path.join(tempfile.gettempdir(), f"voice_{i}.wav")
+            stretched_path = os.path.join(tempfile.gettempdir(), f"voice_stretch_{i}.wav")
+            if silence_duration > 0:
+                subprocess.run([
+                    "ffmpeg", "-f", "lavfi", "-i",
+                    "anullsrc=channel_layout=mono:sample_rate=44100",
+                    "-t", str(silence_duration), silence_path, "-y"
+                ], stdout=subprocess.PIPE)
+                concat_file.write(f"file '{silence_path}'\n")
+            generate_gtts_clip(text, voice_path)
+            stretch_audio_to_duration(voice_path, stretched_path, duration)
+            concat_file.write(f"file '{stretched_path}'\n")
+            last_end = end_sec
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+        "-i", concat_txt, "-c:a", "aac", output_path
+    ], stdout=subprocess.PIPE)
+
+def add_background_music(voice_path, music_path, final_audio_path):
+    subprocess.run([
+        "ffmpeg", "-y", "-i", voice_path, "-i", music_path,
+        "-filter_complex",
+        "[1:a]volume=0.1[a1];[0:a][a1]amix=inputs=2:duration=first:dropout_transition=2",
+        "-c:a", "aac", final_audio_path
+    ], stdout=subprocess.PIPE)
+
+def merge_audio_video(video_path, audio_path, output_path):
+    subprocess.run([
+        "ffmpeg", "-y", "-i", video_path, "-i", audio_path,
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
+    ], stdout=subprocess.PIPE)
+
 if generate and uploaded_video and uploaded_srt:
-    with st.spinner("⏳ Generating video with voiceover, please wait..."):
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as v_tmp:
-                v_tmp.write(uploaded_video.read())
-                video_path = v_tmp.name
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
+        tmp_video.write(uploaded_video.read())
+        video_path = tmp_video.name
 
-            srt_text = uploaded_srt.read().decode("utf-8")
-            entries = parse_srt(srt_text)
+    srt_text = uploaded_srt.read().decode("utf-8")
+    parsed_entries = parse_srt_file(srt_text)
+    voice_path = tempfile.mktemp(suffix=".aac")
+    build_timed_audio_srt(parsed_entries, voice_path)
 
-            voice_path = tempfile.mktemp(suffix=".wav")
-            create_voiceover_wav(entries, voice_path)
+    music_path = None
+    final_audio = voice_path
 
-            if not os.path.exists(voice_path) or os.path.getsize(voice_path) == 0:
-                raise FileNotFoundError("Generated voiceover audio file is empty or missing.")
+    if uploaded_music:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_music:
+            tmp_music.write(uploaded_music.read())
+            music_path = tmp_music.name
+    elif default_music_choice != "None":
+        music_url = DEFAULT_MUSIC[default_music_choice]
+        music_path = tempfile.mktemp(suffix=".mp3")
+        subprocess.run(["wget", music_url, "-O", music_path], stdout=subprocess.PIPE)
 
-            if uploaded_music:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as m_tmp:
-                    m_tmp.write(uploaded_music.read())
-                    music_path = m_tmp.name
-            elif default_music_choice != "None":
-                music_url = DEFAULT_MUSIC[default_music_choice]
-                music_path = tempfile.mktemp(suffix=".mp3")
-                r = requests.get(music_url)
-                with open(music_path, "wb") as f:
-                    f.write(r.content)
-            else:
-                music_path = None
+    if music_path:
+        mixed_audio = tempfile.mktemp(suffix=".aac")
+        add_background_music(voice_path, music_path, mixed_audio)
+        final_audio = mixed_audio
 
-            final_audio = tempfile.mktemp(suffix=".aac")
-            if music_path:
-                merge_audio_music(voice_path, music_path, final_audio)
-            else:
-                result = subprocess.run(["ffmpeg", "-y", "-i", voice_path, "-c:a", "aac", final_audio], capture_output=True)
-                if result.returncode != 0:
-                    raise RuntimeError(f"FFmpeg voice encoding failed: {result.stderr.decode()}")
+    st.subheader("🎧 Preview Voiceover")
+    st.audio(final_audio, format="audio/aac")
 
-            final_video = tempfile.mktemp(suffix=".mp4")
-            merge_audio_video(video_path, final_audio, final_video)
+    final_output = tempfile.mktemp(suffix=".mp4")
+    merge_audio_video(video_path, final_audio, final_output)
 
-            st.success("✅ Processing complete! You can now download your video.")
-            with open(final_video, "rb") as f:
-                video_bytes = f.read()
-                st.video(video_bytes)
-            with open(final_video, "rb") as f:
-                st.download_button("📅 Download Final Video", f, file_name="final_output.mp4")
-        except Exception as e:
-            st.error(f"❌ An error occurred: {e}")
+    if os.path.exists(final_output):
+        st.success("✅ Video generated successfully!")
+        with open(final_output, "rb") as f:
+            st.download_button("📥 Download Final Video", f, file_name="voiceover_output.mp4")
