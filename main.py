@@ -52,7 +52,7 @@ Upload your video and SRT file on the left to begin.
 4. Click the **Generate Voiceover** button.
 5. Wait for the tool to process and download the final video.
 
-### 📄 SRT File Format Example:
+### 📄 SRT File Format Example [Save as "yourscript.srt"]:
 ```
 1
 00:00:00,000 --> 00:00:05,000
