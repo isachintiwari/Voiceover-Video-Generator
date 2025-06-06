@@ -27,7 +27,12 @@ def srt_time_to_seconds(t):
 
 
 def generate_gtts_clip(text, path):
-    gTTS(text).save(path)
+    tts_path = path.replace(".mp3", "_raw.mp3")
+    gTTS(text).save(tts_path)
+    # Convert to proper format for concat
+    subprocess.run([
+        "ffmpeg", "-y", "-i", tts_path, "-ar", "44100", "-ac", "2", "-b:a", "192k", path
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def build_timed_audio_srt(srt_entries, output_path):
@@ -56,7 +61,7 @@ def build_timed_audio_srt(srt_entries, output_path):
             generate_gtts_clip(text, voice_path)
             subprocess.run([
                 "ffmpeg", "-y", "-i", voice_path, "-t", str(duration),
-                "-ar", "44100", "-ac", "1", "-b:a", "192k", trimmed_path
+                "-ar", "44100", "-ac", "2", "-b:a", "192k", trimmed_path
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             concat_file.write(f"file '{trimmed_path}'\n")
             last_end = end_sec
