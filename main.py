@@ -1,4 +1,4 @@
-# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg
+# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Improved Sync)
 
 import os
 import re
@@ -9,13 +9,14 @@ from gtts import gTTS
 
 
 def parse_srt_file(srt_text):
-    blocks = re.findall(r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.*?)\s+(?=\d+\s+[\d:,]+ -->|\Z)", srt_text, re.DOTALL)
+    pattern = r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.+?)(?=\n\d+\n|\Z)"
+    matches = re.findall(pattern, srt_text.strip(), re.DOTALL)
     entries = []
-    for _, start, end, text in blocks:
-        start_clean = start.replace(",", ".")
-        end_clean = end.replace(",", ".")
-        text_clean = " ".join(text.strip().splitlines()).strip()
-        entries.append((start_clean, end_clean, text_clean))
+    for _, start, end, text in matches:
+        start = start.replace(",", ".")
+        end = end.replace(",", ".")
+        text = " ".join(text.strip().splitlines()).strip()
+        entries.append((start, end, text))
     return entries
 
 
@@ -48,20 +49,21 @@ def build_timed_audio_srt(srt_entries, output_path):
                 subprocess.run([
                     "ffmpeg", "-f", "lavfi", "-i",
                     "anullsrc=channel_layout=mono:sample_rate=44100",
-                    "-t", str(silence_duration), silence_path, "-y"
+                    "-t", str(silence_duration), "-q:a", "9", "-acodec", "libmp3lame", silence_path, "-y"
                 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 concat_file.write(f"file '{silence_path}'\n")
 
             generate_gtts_clip(text, voice_path)
             subprocess.run([
-                "ffmpeg", "-y", "-i", voice_path, "-t", str(duration), trimmed_path
+                "ffmpeg", "-y", "-i", voice_path, "-t", str(duration),
+                "-ar", "44100", "-ac", "1", "-b:a", "192k", trimmed_path
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             concat_file.write(f"file '{trimmed_path}'\n")
             last_end = end_sec
 
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-        "-i", concat_txt, "-c", "copy", output_path
+        "-i", concat_txt, "-acodec", "aac", output_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
