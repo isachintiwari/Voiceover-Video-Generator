@@ -41,8 +41,7 @@ def generate_tts_clip(text, path):
     tts.save(path)
 
 def combine_audio_clips(srt_entries, output_audio_path):
-    temp_clips = []
-
+    temp_audio_list = []
     for idx, (start, end, text) in enumerate(srt_entries):
         start_sec = time_to_seconds(start)
         end_sec = time_to_seconds(end)
@@ -51,47 +50,34 @@ def combine_audio_clips(srt_entries, output_audio_path):
         tts_path = tempfile.mktemp(suffix=".mp3")
         generate_tts_clip(text, tts_path)
 
-        delayed_tts = tempfile.mktemp(suffix=".mp3")
+        padded_path = tempfile.mktemp(suffix=".mp3")
         subprocess.run([
-            "ffmpeg", "-y",
-            "-f", "lavfi", "-t", str(start_sec), "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-i", tts_path,
-            "-filter_complex", "[0][1]concat=n=2:v=0:a=1",
-            "-t", str(end_sec),
-            delayed_tts
+            "ffmpeg", "-y", "-i", tts_path,
+            "-af", f"apad=pad_dur={duration}",
+            "-t", str(duration), padded_path
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        temp_clips.append(delayed_tts)
+        temp_audio_list.append((start_sec, padded_path))
 
-    # Save concat list
-    concat_list = tempfile.mktemp(suffix=".txt")
-    with open(concat_list, "w") as f:
-        for clip in temp_clips:
-            f.write(f"file '{clip}'\n")
+    temp_audio_list.sort()
+    concat_txt = tempfile.mktemp(suffix=".txt")
+    with open(concat_txt, "w") as f:
+        for _, path in temp_audio_list:
+            f.write(f"file '{path}'\n")
 
     subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list,
-        "-c", "aac", output_audio_path
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt,
+        "-c", "copy", output_audio_path
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     return output_audio_path
 
 def merge_audio_music(voice_path, music_path, output_path):
-    try:
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", voice_path,
-            "-i", music_path,
-            "-filter_complex",
-            "[0:a]volume=1.5[a0];[1:a]volume=0.2[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=3",
-            "-c:a", "aac", "-shortest", output_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        st.warning("⚠️ Background music could not be merged, using voice only.")
-        subprocess.run([
-            "ffmpeg", "-y", "-i", voice_path, "-c:a", "aac", output_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
+    subprocess.run([
+        "ffmpeg", "-y", "-i", voice_path, "-i", music_path, "-filter_complex",
+        "[0:a]volume=1.5[a0];[1:a]volume=0.3[a1];[a0][a1]amix=inputs=2:duration=longest",
+        "-c:a", "aac", "-shortest", output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def merge_audio_video(video_path, audio_path, output_path):
     subprocess.run([
@@ -106,7 +92,7 @@ with st.sidebar:
     default_music_choice = st.selectbox("Or choose a default music", ["None"] + list(DEFAULT_MUSIC.keys()))
     generate = st.button("Generate Voiceover")
 
-st.title("🎙️ Voiceover Video Generator")
+st.title("🎧 Voiceover Video Generator")
 st.markdown("""
 This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
 Upload your video and SRT file on the left to begin.
@@ -175,6 +161,6 @@ if generate and uploaded_video and uploaded_srt:
                 video_bytes = f.read()
                 st.video(video_bytes)
             with open(final_video, "rb") as f:
-                st.download_button("📥 Download Final Video", f, file_name="final_output.mp4")
+                st.download_button("📅 Download Final Video", f, file_name="final_output.mp4")
         except Exception as e:
             st.error(f"❌ An error occurred: {e}")
