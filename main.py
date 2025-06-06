@@ -41,30 +41,37 @@ def generate_tts_clip(text, path):
     tts.save(path)
 
 def combine_audio_clips(srt_entries, output_audio_path):
-    temp_audio_list = []
+    audio_files = []
     for idx, (start, end, text) in enumerate(srt_entries):
         start_sec = time_to_seconds(start)
-        end_sec = time_to_seconds(end)
-        duration = end_sec - start_sec
 
+        # 1. Generate TTS voice clip
         tts_path = tempfile.mktemp(suffix=".mp3")
         generate_tts_clip(text, tts_path)
 
-        padded_path = tempfile.mktemp(suffix=".mp3")
+        # 2. Create leading silence
+        silence_path = tempfile.mktemp(suffix=".mp3")
         subprocess.run([
-            "ffmpeg", "-y", "-i", tts_path,
-            "-af", f"apad=pad_dur={duration}",
-            "-t", str(duration), padded_path
+            "ffmpeg", "-y", "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=mono",
+            "-t", str(start_sec), silence_path
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        temp_audio_list.append((start_sec, padded_path))
+        # 3. Combine silence + TTS clip
+        padded_path = tempfile.mktemp(suffix=".mp3")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", f"concat:{silence_path}|{tts_path}",
+            "-c", "copy", padded_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    temp_audio_list.sort()
+        audio_files.append(padded_path)
+
+    # 4. Create concat.txt
     concat_txt = tempfile.mktemp(suffix=".txt")
     with open(concat_txt, "w") as f:
-        for _, path in temp_audio_list:
-            f.write(f"file '{path}'\n")
+        for file in audio_files:
+            f.write(f"file '{file}'\n")
 
+    # 5. Merge all clips into final voiceover
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt,
         "-c", "copy", output_audio_path
