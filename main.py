@@ -19,8 +19,7 @@ st.set_page_config(
 DEFAULT_MUSIC = {
     "Soft Piano": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Komiku/It_Grows/Komiku_-_01_-_Friends_Call_Me_Jimmy.mp3",
     "Ambient Loop": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Lobo_Loco/Sounds_of_the_Street/Lobo_Loco_-_01_-_Ladies_Night_ID_1179.mp3",
-    "Calm Background": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Monplaisir/Loyalty_Freak_Music/Monplaisir_-_03_-_Electric_Dawn.mp3",
-    "Eona Ambient Pop": "https://raw.githubusercontent.com/isachintiwari/tools/dev/eona-emotional-ambient-pop-351436.mp3"
+    "Calm Background": "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Monplaisir/Loyalty_Freak_Music/Monplaisir_-_03_-_Electric_Dawn.mp3"
 }
 
 def parse_srt(file_content):
@@ -86,16 +85,6 @@ with st.sidebar:
     uploaded_music = st.file_uploader("(Optional) Upload your own background music (MP3)", type=["mp3"])
     default_music_choice = st.selectbox("Or choose a default music", ["None"] + list(DEFAULT_MUSIC.keys()))
     generate = st.button("Generate Voiceover")
-
-    st.markdown("---")
-    st.markdown("""
-    <div style='text-align: center;'>
-        <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
-        <a href='https://coff.ee/isachintiwari' target='_blank'>
-            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 18px !important; margin-top: 4px;'>
-        </a>
-    </div>
-    """, unsafe_allow_html=True)
 
 st.title("🎙️ Voiceover Video Generator")
 st.markdown("""
