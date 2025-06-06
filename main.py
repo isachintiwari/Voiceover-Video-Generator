@@ -22,6 +22,51 @@ DEFAULT_MUSIC = {
     "Eona Ambient Pop": "https://raw.githubusercontent.com/isachintiwari/tools/dev/eona-emotional-ambient-pop-351436.mp3"
 }
 
+def parse_srt(file_content):
+    entries = []
+    blocks = re.split(r"\n\n", file_content.strip())
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) >= 3:
+            times = lines[1].split(" --> ")
+            text = " ".join(lines[2:])
+            entries.append((times[0], times[1], text))
+    return entries
+
+def time_to_seconds(t):
+    h, m, s = t.replace(",", ".").split(":")
+    return int(h)*3600 + int(m)*60 + float(s)
+
+def generate_tts_clip(text, path):
+    tts = gTTS(text)
+    tts.save(path)
+
+def combine_audio_clips(srt_entries, output_audio_path):
+    clips = []
+    base_dir = tempfile.mkdtemp()
+    for idx, (start, end, text) in enumerate(srt_entries):
+        temp_path = os.path.join(base_dir, f"line{idx}.mp3")
+        generate_tts_clip(text, temp_path)
+        clips.append(temp_path)
+    concat_txt = os.path.join(base_dir, "inputs.txt")
+    with open(concat_txt, "w") as f:
+        for clip in clips:
+            f.write(f"file '{clip}'\n")
+    final_path = output_audio_path
+    subprocess.run(["ffmpeg", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c", "copy", final_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return final_path
+
+def merge_audio_music(voice_path, music_path, output_path):
+    subprocess.run([
+        "ffmpeg", "-i", voice_path, "-i", music_path, "-filter_complex",
+        "[0:a][1:a]amix=inputs=2:duration=longest", "-c:a", "aac", output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def merge_audio_video(video_path, audio_path, output_path):
+    subprocess.run([
+        "ffmpeg", "-i", video_path, "-i", audio_path, "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 with st.sidebar:
     st.header("🎛️ Configuration")
     uploaded_video = st.file_uploader("Upload MP4 video", type=["mp4"])
@@ -34,7 +79,7 @@ with st.sidebar:
     st.markdown("""
     <div style='text-align: center;'>
         <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
-        <a href='https://coff.ee/isachintiwari' target='_blank'>
+        <a href='https://coff.ee/isachintiwari' target='_blank' style="display:none";>
             <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='height: 20px !important; margin-top: 4px;'>
         </a>
     </div>
@@ -69,19 +114,44 @@ Then, optionally upload background music or choose a default one. Click the butt
 Ensure your timestamps are formatted correctly and do not overlap.
 """)
 
-# ✅ FIX for audio preview crash
-
-def safe_audio_preview(audio_path, audio_format="audio/mp3"):
-    try:
-        with open(audio_path, "rb") as f:
-            st.audio(f.read(), format=audio_format)
-    except Exception as e:
-        st.warning(f"Preview failed: {e}")
-
-# ✅ Display spinner during processing
 if generate and uploaded_video and uploaded_srt:
     with st.spinner("⏳ Generating video with voiceover, please wait..."):
         try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as v_tmp:
+                v_tmp.write(uploaded_video.read())
+                video_path = v_tmp.name
+            
+            srt_text = uploaded_srt.read().decode("utf-8")
+            entries = parse_srt(srt_text)
+
+            voice_path = tempfile.mktemp(suffix=".mp3")
+            combine_audio_clips(entries, voice_path)
+
+            if uploaded_music:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as m_tmp:
+                    m_tmp.write(uploaded_music.read())
+                    music_path = m_tmp.name
+            elif default_music_choice != "None":
+                music_url = DEFAULT_MUSIC[default_music_choice]
+                music_path = tempfile.mktemp(suffix=".mp3")
+                r = requests.get(music_url)
+                with open(music_path, "wb") as f:
+                    f.write(r.content)
+            else:
+                music_path = None
+
+            final_audio = tempfile.mktemp(suffix=".aac")
+            if music_path:
+                merge_audio_music(voice_path, music_path, final_audio)
+            else:
+                final_audio = voice_path
+
+            final_video = tempfile.mktemp(suffix=".mp4")
+            merge_audio_video(video_path, final_audio, final_video)
+
             st.success("✅ Processing complete! You can now download your video.")
+            with open(final_video, "rb") as f:
+                st.video(f.read())
+                st.download_button("📥 Download Final Video", f, file_name="final_output.mp4")
         except Exception as e:
             st.error(f"❌ An error occurred: {e}")
