@@ -1,4 +1,4 @@
-# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Improved Sync)
+# Voiceover Video Tool - SRT-based Version with gTTS + ffmpeg (Improved Sync + Error Logging)
 
 import os
 import re
@@ -61,18 +61,28 @@ def build_timed_audio_srt(srt_entries, output_path):
             concat_file.write(f"file '{trimmed_path}'\n")
             last_end = end_sec
 
-    subprocess.run([
+    result = subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", concat_txt, "-acodec", "aac", output_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
+    if not os.path.exists(output_path):
+        st.error("❌ Failed to generate audio from subtitles.")
+        st.text("FFmpeg audio error:")
+        st.code(result.stderr.decode())
+
 
 def merge_audio_video(video_path, audio_path, output_path):
-    subprocess.run([
+    result = subprocess.run([
         "ffmpeg", "-y", "-i", video_path, "-i", audio_path,
         "-c:v", "copy", "-c:a", "aac", "-shortest",
         output_path
     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    if not os.path.exists(output_path):
+        st.error("❌ Failed to generate final video.")
+        st.text("FFmpeg merge error:")
+        st.code(result.stderr.decode())
 
 
 # Streamlit UI
@@ -95,6 +105,7 @@ if st.button("Generate Voiceover") and uploaded_video and uploaded_srt:
     final_output = tempfile.mktemp(suffix=".mp4")
     merge_audio_video(video_path, voice_path, final_output)
 
-    st.success("✅ Your video is ready! Download below:")
-    with open(final_output, "rb") as f:
-        st.download_button("📥 Download Final Video", f, file_name="voiceover_output.mp4")
+    if os.path.exists(final_output):
+        st.success("✅ Your video is ready! Download below:")
+        with open(final_output, "rb") as f:
+            st.download_button("📥 Download Final Video", f, file_name="voiceover_output.mp4")
