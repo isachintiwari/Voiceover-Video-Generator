@@ -42,19 +42,35 @@ def generate_tts_clip(text, path):
     tts.save(path)
 
 def combine_audio_clips(srt_entries, output_audio_path):
-    clips = []
-    base_dir = tempfile.mkdtemp()
-    for idx, (start, end, text) in enumerate(srt_entries):
-        temp_path = os.path.join(base_dir, f"line{idx}.mp3")
-        generate_tts_clip(text, temp_path)
-        clips.append(temp_path)
-    concat_txt = os.path.join(base_dir, "inputs.txt")
-    with open(concat_txt, "w") as f:
-        for clip in clips:
-            f.write(f"file '{clip}'\n")
-    final_path = output_audio_path
-    subprocess.run(["ffmpeg", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c:a", "libmp3lame", final_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return final_path
+    from pydub import AudioSegment
+    audio = AudioSegment.silent(duration=0)
+    for start, end, text in srt_entries:
+        start_ms = time_to_seconds(start) * 1000
+        end_ms = time_to_seconds(end) * 1000
+        duration_ms = end_ms - start_ms
+
+        tts = gTTS(text)
+        tts_path = tempfile.mktemp(suffix=".mp3")
+        tts.save(tts_path)
+
+        clip = AudioSegment.from_file(tts_path)
+
+        # Pad voice clip if shorter than desired duration
+        if len(clip) < duration_ms:
+            clip += AudioSegment.silent(duration=(duration_ms - len(clip)))
+        else:
+            clip = clip[:duration_ms]
+
+        # Pad silence before this clip
+        silence_padding = start_ms - len(audio)
+        if silence_padding > 0:
+            audio += AudioSegment.silent(duration=silence_padding)
+
+        audio += clip
+
+    audio.export(output_audio_path, format="mp3")
+    return output_audio_path
+
 
 def merge_audio_music(voice_path, music_path, output_path):
     subprocess.run([
