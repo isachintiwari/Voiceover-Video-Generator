@@ -2,9 +2,9 @@ import os
 import re
 import subprocess
 import tempfile
-import urllib.request
 import streamlit as st
 from gtts import gTTS
+import requests
 
 st.set_page_config(
     page_title="Voiceover Video Tool",
@@ -126,7 +126,14 @@ if generate and uploaded_video and uploaded_srt:
     elif default_music_choice != "None":
         music_url = DEFAULT_MUSIC[default_music_choice]
         music_path = tempfile.mktemp(suffix=".mp3")
-        urllib.request.urlretrieve(music_url, music_path)
+        try:
+            r = requests.get(music_url)
+            r.raise_for_status()
+            with open(music_path, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            st.error(f"❌ Failed to download background music: {e}")
+            music_path = None
 
     if music_path:
         mixed_audio = tempfile.mktemp(suffix=".aac")
