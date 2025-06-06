@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+import urllib.request
 import streamlit as st
 from gtts import gTTS
 
@@ -125,7 +126,7 @@ if generate and uploaded_video and uploaded_srt:
     elif default_music_choice != "None":
         music_url = DEFAULT_MUSIC[default_music_choice]
         music_path = tempfile.mktemp(suffix=".mp3")
-        subprocess.run(["wget", music_url, "-O", music_path], stdout=subprocess.PIPE)
+        urllib.request.urlretrieve(music_url, music_path)
 
     if music_path:
         mixed_audio = tempfile.mktemp(suffix=".aac")
