@@ -11,7 +11,7 @@ st.set_page_config(
     page_icon="🎤",
     layout="wide",
     menu_items={
-        "About": "This tool lets you auto-generate voiceovers from subtitles and add background music to videos."
+        "About": "This tool lets you auto-generate voiceovers from subtitles and add background music to videos.."
     }
 )
 
