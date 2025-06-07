@@ -41,6 +41,12 @@ st.title("🎙️ Voiceover Video Generator")
 
 if generate and uploaded_video and uploaded_srt:
     with st.spinner("⏳ Generating video with voiceover, please wait..."):
+        st.markdown("""
+This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
+Upload your video and SRT file on the left to begin.
+
+Ensure your timestamps are formatted correctly and do not overlap.
+""")
 
         def parse_srt_file(srt_text):
             pattern = r"(\d+)\s+([\d:,]+) --> ([\d:,]+)\s+(.+?)(?=\n\d+\n|\Z)"
