@@ -41,6 +41,29 @@ st.title("🎙️ Voiceover Video Generator")
 st.markdown("""
 This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
 Upload your video and SRT file on the left to begin.
+
+### 🔧 Steps to Use:
+1. **Upload your MP4 video** file using the sidebar.
+2. **Upload your .srt subtitle file**, which contains the timed narration.
+3. **(Optional)** Add your own background music or pick from the default list.
+4. Click the **Generate Voiceover** button.
+5. Wait for the tool to process and download the final video.
+
+### 📄 SRT File Format Example [yourscript.srt]:
+```
+1
+00:00:00,000 --> 00:00:05,000
+Welcome! In this quick guide, you'll learn how to use this tool to create voiceovers with background music.
+
+2
+00:00:06,000 --> 00:00:15,000
+First, upload your video file and subtitle file using the options on the left.
+
+3
+00:00:16,000 --> 00:00:25,000
+Then, optionally upload background music or choose a default one. Click the button to generate your final video.
+```
+Ensure your timestamps are formatted correctly and do not overlap.
 """)
 
 def parse_srt_file(srt_text):
