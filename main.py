@@ -40,6 +40,12 @@ with st.sidebar:
 st.title("🎙️ Voiceover Video Generator")
 
 if generate:
+    if not uploaded_video:
+        st.warning("⚠️ Please upload a video file.")
+    elif not uploaded_srt:
+        st.warning("⚠️ Please upload an SRT subtitle file.")
+    else:
+
     with st.spinner("⏳ Generating video with voiceover, please wait..."):
         st.markdown("""
 This tool helps you generate voiceovers from subtitle files and combine them with video and optional background music.
