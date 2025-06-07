@@ -31,9 +31,11 @@ with st.sidebar:
     st.markdown("""
     <div style='text-align: center;'>
         <span style='font-size: 13px;'>Made with ❤️ by <a href='https://coff.ee/isachintiwari' target='_blank'>@isachintiwari</a></span><br>
+        <span style='max-height: 50px !important;max-width: 50% !important;'>
         <a href='https://coff.ee/isachintiwari' target='_blank'>
             <img src='https://cdn.buymeacoffee.com/buttons/v2/default-orange.png' alt='Buy Me A Coffee' style='max-height: 50px !important;max-width: 50% !important; margin-top: 5px;'>
         </a>
+        </span>
     </div>
     """, unsafe_allow_html=True)
 
