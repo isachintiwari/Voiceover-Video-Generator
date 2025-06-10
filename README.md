@@ -16,7 +16,7 @@ Generate engaging videos with natural voiceovers from subtitle (`.srt`) files an
 
 ## 🖥️ Live Demo
 
-> [Streamlit Cloud](https://voiceover-video-generator-from-srt.streamlit.app/)
+> [Streamlit Cloud](https://voiceover-video-generator.streamlit.app/)
 
 ---
 
