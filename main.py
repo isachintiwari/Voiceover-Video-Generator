@@ -15,6 +15,12 @@ st.set_page_config(
     }
 )
 
+# Google site verification meta tag
+st.markdown("""
+    <meta name="google-site-verification" content="PqgDmFj1-u8HcMzb11dlE_yfrOhXMfSkztOSO_eFVKU" />
+""", unsafe_allow_html=True)
+
+
 DEFAULT_MUSIC = {
     "Eona Ambient Pop": "https://raw.githubusercontent.com/isachintiwari/tools/dev/eona-emotional-ambient-pop-351436.mp3"
 }
